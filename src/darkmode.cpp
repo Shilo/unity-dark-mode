@@ -127,8 +127,8 @@ static bool IsUnityWindow(HWND hWnd)
 {
     wchar_t buf[256];
     GetClassNameW(hWnd, buf, 256);
-    // Match "UnityContainerWndClass" and any other Unity-prefixed classes
-    return wcsstr(buf, L"Unity") != nullptr;
+    // Match "UnityContainerWndClass" and related Unity container classes
+    return wcsstr(buf, L"UnityContainer") != nullptr;
 }
 
 static bool ShouldSubclass(HWND hWnd)
@@ -155,9 +155,9 @@ static void EnableDarkModeForWindow(HWND hWnd)
     // Dark title bar via documented DWM attribute (Windows 10 2004+ / Win 11)
     if (hWnd)
     {
+        static constexpr DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_ATTR = 20;
         const BOOL useDark = TRUE;
-        // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
-        DwmSetWindowAttribute(hWnd, 20, &useDark, sizeof(useDark));
+        DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE_ATTR, &useDark, sizeof(useDark));
     }
 
     // Force dark context menus via undocumented uxtheme ordinal #135
@@ -457,6 +457,9 @@ static LRESULT CALLBACK SubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 // ---------------------------------------------------------------------------
 static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
+    if (nCode < 0)
+        return CallNextHookEx(g_cbtHook, nCode, wParam, lParam);
+
     switch (nCode)
     {
     case HCBT_CREATEWND:
