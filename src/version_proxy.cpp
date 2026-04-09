@@ -1,4 +1,5 @@
 #include "version_proxy.h"
+#include <cstdio>
 
 // ---------------------------------------------------------------------------
 // version.dll proxy
