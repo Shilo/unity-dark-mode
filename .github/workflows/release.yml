@@ -18,30 +18,42 @@ jobs:
       - name: Calculate next version
         id: version
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Get the latest version tag (e.g. v1.3), sorted by version
           LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | head -n 1)
 
           if [ -z "$LATEST" ]; then
-            # No previous release -- start at v0.1
             NEXT="v0.1"
             echo "prev_tag=" >> "$GITHUB_OUTPUT"
           else
-            echo "prev_tag=${LATEST}" >> "$GITHUB_OUTPUT"
+            # Check if the latest tag has an incomplete release (orphaned tag).
+            # If so, clean it up and reuse that version number.
+            if ! gh release view "$LATEST" &>/dev/null; then
+              echo "Found orphaned tag ${LATEST} with no release. Cleaning up."
+              git push origin --delete "$LATEST" 2>/dev/null || true
+              # Recalculate: find the tag before the orphan
+              PREV=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | grep -v "^${LATEST}$" | head -n 1)
+              echo "prev_tag=${PREV}" >> "$GITHUB_OUTPUT"
+              NEXT="$LATEST"
+            else
+              echo "prev_tag=${LATEST}" >> "$GITHUB_OUTPUT"
 
-            # Parse major.minor from tag
-            VERSION="${LATEST#v}"
-            MAJOR="${VERSION%%.*}"
-            MINOR="${VERSION#*.}"
+              # Parse major.minor from tag
+              VERSION="${LATEST#v}"
+              MAJOR="${VERSION%%.*}"
+              MINOR="${VERSION#*.}"
 
-            # Increment: minor + 1, roll over at 10
-            MINOR=$((MINOR + 1))
-            if [ "$MINOR" -gt 9 ]; then
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
+              # Increment: minor + 1, roll over at 10
+              MINOR=$((MINOR + 1))
+              if [ "$MINOR" -gt 9 ]; then
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+              fi
+
+              NEXT="v${MAJOR}.${MINOR}"
             fi
-
-            NEXT="v${MAJOR}.${MINOR}"
           fi
 
           echo "Next version: ${NEXT}"
@@ -105,10 +117,17 @@ jobs:
           # Strip leading whitespace from heredoc indentation
           sed -i 's/^          //' release-notes.md
 
-          # Create the tag and release atomically via gh.
-          # --target ensures the tag is created on the current commit.
-          # If this step fails, no orphaned tag is left behind.
-          gh release create "$TAG" build/version.dll \
+          # Create the tag and release via gh. --target creates the tag
+          # on the current commit. If the command fails partway through
+          # (e.g. asset upload fails after release/tag creation), clean up
+          # the partial release and tag so a rerun starts fresh.
+          if ! gh release create "$TAG" build/version.dll \
             --title "$TAG" \
             --target "$GITHUB_SHA" \
-            --notes-file release-notes.md
+            --notes-file release-notes.md; then
+
+            echo "Release creation failed. Cleaning up partial release/tag."
+            gh release delete "$TAG" --yes 2>/dev/null || true
+            git push origin --delete "$TAG" 2>/dev/null || true
+            exit 1
+          fi
