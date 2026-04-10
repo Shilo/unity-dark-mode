@@ -1,8 +1,8 @@
-# Unity 4.6 Dark Mode
+# unity-dark-mode
 
 Zero-setup dark mode for the Unity 4.6 Editor on Windows 11. Drop a single DLL next to `Unity.exe` and the title bar, menu bar, context menus, and native dialogs all go dark.
 
-Unity 4.6's Pro skin darkens the editor panels, but the OS-level window chrome stays light. This project fixes that gap.
+Unity 4.6's Pro skin darkens the editor panels, but the OS-level window chrome stays light. This project fixes that gap by patching the Win32 window rendering at load time.
 
 ## Quick Start
 
