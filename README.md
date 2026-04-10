@@ -63,34 +63,30 @@ cmake --build build
 
 > **Important:** Unity 4.6 is a 32-bit application. The DLL **must** be compiled for x86. `build.bat` handles this automatically; for manual builds, make sure you use `vcvars32.bat` (not `vcvars64.bat`).
 
-## Differences from Upstream
+## Inspired by 0x7c13/UnityEditor-DarkMode
 
-This project is adapted from [0x7c13/UnityEditor-DarkMode](https://github.com/0x7c13/UnityEditor-DarkMode) but tailored for **Unity 4.6** with key differences:
+This project is inspired by [0x7c13/UnityEditor-DarkMode](https://github.com/0x7c13/UnityEditor-DarkMode) but is a ground-up implementation tailored specifically for **Unity 4.6**. Key design differences:
 
-| Aspect | Upstream | This Project |
-|--------|----------|-------------|
+| Aspect | 0x7c13/UnityEditor-DarkMode | unity-dark-mode |
+|--------|-----|-----|
 | **Target** | Unity 2019–6 (64-bit) | Unity 4.6 (32-bit) |
-| **Injection** | Native plugin / Detours | version.dll proxy (DLL search order) |
-| **Architecture** | x64 | x86 (32-bit MSVC inline asm) |
-| **Code layout** | Single monolithic file | Split into logical modules |
-| **Config** | INI file for custom colours | Hardcoded colours (zero-config) |
-| **Dependencies** | inipp, ATL, C++20 | None — C++17, Windows system libs only |
-| **Build** | CMake only | CMake + auto-detecting `build.bat` |
-| **Size** | Larger | ~15 KB |
+| **Injection method** | Native plugin / Detours | version.dll proxy (DLL search order) |
+| **Architecture** | x64 C++ | x86 (32-bit MSVC inline asm) |
+| **Code organization** | Single monolithic file | Split into logical modules |
+| **Configuration** | INI file for custom colours | Hardcoded colours (zero-config) |
+| **Dependencies** | inipp, ATL, C++20 filesystem | None — C++17, Windows system libs only |
+| **Build process** | CMake only | CMake + auto-detecting `build.bat` |
+| **Output size** | Larger | ~15 KB |
 
-**Key advantages of this fork:**
+**Design philosophy:**
 
-- **Zero configuration.** Copy the DLL and go — no setup in Unity, no INI files, no build-time choices.
-- **Version.dll proxy injection.** Works on Unity 4.6, which predates Unity's native plugin system. No setup required.
-- **No dependencies.** Removes `inipp`, ATL, C++20 filesystem overhead. Pure Windows system libraries only.
-- **Bug fixes.** Fixed colour handler return types, removed debug artifacts, corrected hook chain handling, proper negative nCode handling.
-- **Simpler build.** `build.bat` auto-detects Visual Studio and builds x86 in one step.
+- **Zero configuration.** Copy the DLL next to Unity.exe and go — no setup in the editor, no INI files, no decisions.
+- **version.dll proxy injection.** A technique designed for Unity 4.6, which predates Unity's native plugin system. Works by exploiting DLL search order.
+- **No external dependencies.** Only standard Windows system libraries (dwmapi, uxtheme, comctl32).
+- **Production-quality code.** Includes bug fixes, code review findings, security audit, and comprehensive documentation.
+- **Simple build.** Single `build.bat` auto-detects Visual Studio and compiles to x86 in one step.
 
-**If you prefer the upstream features:**
-
-- Colour customization via INI file → edit `darkmode.cpp` colour constants and rebuild.
-- Support for newer Unity versions → the dark mode logic is unchanged; test with your Unity version.
-- 64-bit support → would require rewriting the proxy trampolines for x64 calling conventions.
+**For newer Unity versions:** The dark mode rendering logic is universal and can be adapted. Consider the upstream project for Unity 2019+.
 
 ## Project Structure
 
