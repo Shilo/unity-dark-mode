@@ -37,8 +37,20 @@ static const char* g_functionNames[17] = {
     "VerQueryValueW",
 };
 
+// Safe fallback for any export that could not be resolved from the real DLL.
+// Returns 0 / FALSE which is the typical failure return for version.dll APIs.
+static FARPROC WINAPI FallbackStub()
+{
+    return 0;
+}
+
 void InitializeProxy()
 {
+    // Pre-fill every slot with the safe fallback so the MASM trampolines
+    // never jump through a null pointer, even if the real DLL fails to load.
+    for (int i = 0; i < 17; ++i)
+        g_originalFuncs[i] = reinterpret_cast<FARPROC>(FallbackStub);
+
     // Build the path to the real system version.dll.
     wchar_t systemDir[MAX_PATH];
     GetSystemDirectoryW(systemDir, MAX_PATH);
@@ -52,7 +64,9 @@ void InitializeProxy()
 
     for (int i = 0; i < 17; ++i)
     {
-        g_originalFuncs[i] = GetProcAddress(g_realVersionDll, g_functionNames[i]);
+        FARPROC proc = GetProcAddress(g_realVersionDll, g_functionNames[i]);
+        if (proc)
+            g_originalFuncs[i] = proc;
     }
 }
 

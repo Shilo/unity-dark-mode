@@ -22,6 +22,12 @@ target_include_directories(darkmode_proxy PRIVATE src)
 if(MSVC)
   target_compile_definitions(darkmode_proxy PRIVATE NOMINMAX UNICODE _UNICODE)
   target_compile_options(darkmode_proxy PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/MP>)
+
+  # Static-link the MSVC runtime so the DLL has no dependency on
+  # VCRUNTIME140.dll or UCRT DLLs. This ensures the single-file
+  # drop-in works on machines without the VC redistributable.
+  set_property(TARGET darkmode_proxy PROPERTY
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 # Output as version.dll (the proxy target)
