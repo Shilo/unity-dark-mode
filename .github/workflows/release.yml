@@ -1,9 +1,7 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,7 +13,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for changelog generation
+          fetch-depth: 0  # Full history for changelog and tag detection
+
+      - name: Calculate next version
+        id: version
+        shell: bash
+        run: |
+          # Get the latest version tag (e.g. v1.3), sorted by version
+          LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | head -n 1)
+
+          if [ -z "$LATEST" ]; then
+            # No previous release -- start at v0.1
+            NEXT="v0.1"
+            echo "prev_tag=" >> "$GITHUB_OUTPUT"
+          else
+            echo "prev_tag=${LATEST}" >> "$GITHUB_OUTPUT"
+
+            # Parse major.minor from tag
+            VERSION="${LATEST#v}"
+            MAJOR="${VERSION%%.*}"
+            MINOR="${VERSION#*.}"
+
+            # Increment: minor + 1, roll over at 10
+            MINOR=$((MINOR + 1))
+            if [ "$MINOR" -gt 9 ]; then
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+            fi
+
+            NEXT="v${MAJOR}.${MINOR}"
+          fi
+
+          echo "Next version: ${NEXT}"
+          echo "tag=${NEXT}" >> "$GITHUB_OUTPUT"
 
       - name: Setup MSVC x86 toolchain
         uses: ilammy/msvc-dev-cmd@v1
@@ -36,15 +66,17 @@ jobs:
           $size = (Get-Item "build\version.dll").Length
           Write-Host "version.dll size: $size bytes"
 
-      - name: Create release
+      - name: Create tag and release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
+          TAG="${{ steps.version.outputs.tag }}"
+          PREV_TAG="${{ steps.version.outputs.prev_tag }}"
 
-          # Find the previous tag
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -n 1)
+          # Create and push the version tag
+          git tag "$TAG"
+          git push origin "$TAG"
 
           # Generate changelog
           if [ -z "$PREV_TAG" ]; then
@@ -56,7 +88,7 @@ jobs:
           fi
 
           # Build release notes
-          cat > release-notes.md << EOF
+          cat > release-notes.md << NOTES
           ## Installation
 
           1. Download \`version.dll\` below.
@@ -72,12 +104,12 @@ jobs:
           ${CHANGELOG_HEADER}
 
           ${CHANGELOG}
-          EOF
+          NOTES
 
           # Strip leading whitespace from heredoc indentation
           sed -i 's/^          //' release-notes.md
 
-          # Create the release with the DLL attached
+          # Create the GitHub release with the DLL attached
           gh release create "$TAG" build/version.dll \
             --title "$TAG" \
             --notes-file release-notes.md
