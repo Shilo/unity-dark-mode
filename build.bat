@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-:: Find vcvars32.bat using vswhere (shipped with VS 2017+)
+:: Find vcvars64.bat using vswhere (shipped with VS 2017+)
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" (
     :: Fallback: try common install paths
@@ -12,8 +12,8 @@ if not exist "%VSWHERE%" (
         "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community"
         "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
     ) do (
-        if exist "%%~P\VC\Auxiliary\Build\vcvars32.bat" (
-            call "%%~P\VC\Auxiliary\Build\vcvars32.bat" >nul 2>&1
+        if exist "%%~P\VC\Auxiliary\Build\vcvars64.bat" (
+            call "%%~P\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
             goto :found
         )
     )
@@ -30,10 +30,10 @@ if not defined VSDIR (
     echo ERROR: Could not find Visual Studio with C++ support.
     exit /b 1
 )
-call "%VSDIR%\VC\Auxiliary\Build\vcvars32.bat" >nul 2>&1
+call "%VSDIR%\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
 
 :found
-echo MSVC x86 environment ready
+echo MSVC x64 environment ready
 
 cd /d "%~dp0"
 if exist build rmdir /s /q build
