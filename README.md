@@ -1,4 +1,4 @@
-# unity-dark-mode
+# Unity Dark Mode
 
 Zero-setup dark mode for the Unity 4.6 Editor on Windows 11. Drop a single DLL next to `Unity.exe` and the title bar, menu bar, context menus, and native dialogs all go dark.
 
@@ -14,14 +14,14 @@ To remove, delete `version.dll` from the Unity folder.
 
 ## What Gets Patched
 
-| Element | Before | After |
-|---|---|---|
-| Title bar | White / system default | Dark |
-| Menu bar (File, Edit, ...) | White background, dark text | Dark background, light text |
-| Menu bar hover / selection | System blue highlight | Subtle dark grey highlight |
-| Context menus (right-click) | White | Dark |
-| Native dialogs | White | Dark background, light text |
-| Common controls (tooltips, combo boxes, tree/list views) | White | Dark themed |
+| Element                                                  | Before                      | After                       |
+| -------------------------------------------------------- | --------------------------- | --------------------------- |
+| Title bar                                                | White / system default      | Dark                        |
+| Menu bar (File, Edit, ...)                               | White background, dark text | Dark background, light text |
+| Menu bar hover / selection                               | System blue highlight       | Subtle dark grey highlight  |
+| Context menus (right-click)                              | White                       | Dark                        |
+| Native dialogs                                           | White                       | Dark background, light text |
+| Common controls (tooltips, combo boxes, tree/list views) | White                       | Dark themed                 |
 
 ## How It Works
 
@@ -67,18 +67,18 @@ cmake --build build
 
 This project is inspired by 0x7c13/UnityEditor-DarkMode and uses similar Win32 dark mode techniques, but is a separate implementation built specifically for Unity 4.6.
 
-| | 0x7c13/UnityEditor-DarkMode | unity-dark-mode |
-|---|---|---|
-| **Unity versions** | 2019, 2020, 2021, 2022, 2023, Unity 6 | 4.6 |
-| **Editor architecture** | 64-bit | 32-bit |
-| **How the DLL loads** | Unity native plugin ("Load on startup") or Detours `withdll.exe` | version.dll proxy — auto-loads via DLL search order |
-| **Setup required** | Enable "Load on startup" in plugin settings, or launch via Detours | None — drop DLL next to Unity.exe |
-| **Configuration** | INI file for custom colours | Zero-config (colours hardcoded to match Pro skin) |
-| **External dependencies** | inipp (INI parser), ATL, C++20 `<filesystem>` | None |
-| **C++ standard** | C++20 | C++17 |
-| **Source layout** | Single `.cpp` file | Split across `dllmain.cpp`, `darkmode.cpp`, `version_proxy.cpp` |
-| **Build** | CMake | CMake + one-step `build.bat` (auto-detects Visual Studio) |
-| **Output size** | ~20 KB | ~15 KB |
+|                           | 0x7c13/UnityEditor-DarkMode                                        | unity-dark-mode                                                 |
+| ------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------- |
+| **Unity versions**        | 2019, 2020, 2021, 2022, 2023, Unity 6                              | 4.6                                                             |
+| **Editor architecture**   | 64-bit                                                             | 32-bit                                                          |
+| **How the DLL loads**     | Unity native plugin ("Load on startup") or Detours `withdll.exe`   | version.dll proxy — auto-loads via DLL search order             |
+| **Setup required**        | Enable "Load on startup" in plugin settings, or launch via Detours | None — drop DLL next to Unity.exe                               |
+| **Configuration**         | INI file for custom colours                                        | Zero-config (colours hardcoded to match Pro skin)               |
+| **External dependencies** | inipp (INI parser), ATL, C++20 `<filesystem>`                      | None                                                            |
+| **C++ standard**          | C++20                                                              | C++17                                                           |
+| **Source layout**         | Single `.cpp` file                                                 | Split across `dllmain.cpp`, `darkmode.cpp`, `version_proxy.cpp` |
+| **Build**                 | CMake                                                              | CMake + one-step `build.bat` (auto-detects Visual Studio)       |
+| **Output size**           | ~20 KB                                                             | ~15 KB                                                          |
 
 For newer Unity versions (2019+), use the original project. For Unity 4.6, use this one.
 
