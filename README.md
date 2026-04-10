@@ -63,10 +63,39 @@ cmake --build build
 
 > **Important:** Unity 4.6 is a 32-bit application. The DLL **must** be compiled for x86. `build.bat` handles this automatically; for manual builds, make sure you use `vcvars32.bat` (not `vcvars64.bat`).
 
+## Differences from Upstream
+
+This project is adapted from [0x7c13/UnityEditor-DarkMode](https://github.com/0x7c13/UnityEditor-DarkMode) but tailored for **Unity 4.6** with key differences:
+
+| Aspect | Upstream | This Project |
+|--------|----------|-------------|
+| **Target** | Unity 2019–6 (64-bit) | Unity 4.6 (32-bit) |
+| **Injection** | Native plugin / Detours | version.dll proxy (DLL search order) |
+| **Architecture** | x64 | x86 (32-bit MSVC inline asm) |
+| **Code layout** | Single monolithic file | Split into logical modules |
+| **Config** | INI file for custom colours | Hardcoded colours (zero-config) |
+| **Dependencies** | inipp, ATL, C++20 | None — C++17, Windows system libs only |
+| **Build** | CMake only | CMake + auto-detecting `build.bat` |
+| **Size** | Larger | ~15 KB |
+
+**Key advantages of this fork:**
+
+- **Zero configuration.** Copy the DLL and go — no setup in Unity, no INI files, no build-time choices.
+- **Version.dll proxy injection.** Works on Unity 4.6, which predates Unity's native plugin system. No setup required.
+- **No dependencies.** Removes `inipp`, ATL, C++20 filesystem overhead. Pure Windows system libraries only.
+- **Bug fixes.** Fixed colour handler return types, removed debug artifacts, corrected hook chain handling, proper negative nCode handling.
+- **Simpler build.** `build.bat` auto-detects Visual Studio and builds x86 in one step.
+
+**If you prefer the upstream features:**
+
+- Colour customization via INI file → edit `darkmode.cpp` colour constants and rebuild.
+- Support for newer Unity versions → the dark mode logic is unchanged; test with your Unity version.
+- 64-bit support → would require rewriting the proxy trampolines for x64 calling conventions.
+
 ## Project Structure
 
 ```
-Unity46-DarkMode/
+unity-dark-mode/
   CMakeLists.txt          CMake build configuration
   build.bat               One-step build script (auto-detects VS)
   src/
