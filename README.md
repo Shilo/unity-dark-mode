@@ -4,6 +4,8 @@ Zero-setup dark mode for the Unity 6 Editor on Windows 11. Drop a single DLL nex
 
 Unity 6's dark theme covers the editor panels, but the OS-level window chrome stays light. This project fixes that gap by patching the Win32 window rendering at load time.
 
+![Unity Dark Mode Mod screenshot](docs/screenshot.png)
+
 ## Quick Start
 
 1. Download `version.dll.zip` from the [latest release](../../releases/latest) and extract `version.dll`.
