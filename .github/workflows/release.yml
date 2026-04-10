@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for changelog generation
+
+      - name: Setup MSVC x86 toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Build x86 Release DLL
+        run: |
+          cmake -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Verify output
+        run: |
+          if (!(Test-Path "build\version.dll")) { throw "version.dll not found" }
+          $size = (Get-Item "build\version.dll").Length
+          Write-Host "version.dll size: $size bytes"
+
+      - name: Create release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          # Find the previous tag
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -n 1)
+
+          # Generate changelog
+          if [ -z "$PREV_TAG" ]; then
+            CHANGELOG_HEADER="Initial release."
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            CHANGELOG_HEADER="Changes since \`${PREV_TAG}\`:"
+            CHANGELOG=$(git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Build release notes
+          cat > release-notes.md << EOF
+          ## Installation
+
+          1. Download \`version.dll\` below.
+          2. Copy it into the same folder as your \`Unity.exe\` (e.g. \`C:\\Program Files\\Unity\\Editor\\\`).
+          3. Launch Unity. The title bar, menu bar, context menus, and dialogs are now dark.
+
+          To uninstall, delete \`version.dll\` from the Unity folder.
+
+          > **Requirements:** Windows 11 (or Windows 10 2004+), Unity 4.6 (32-bit Editor).
+
+          ## Changelog
+
+          ${CHANGELOG_HEADER}
+
+          ${CHANGELOG}
+          EOF
+
+          # Strip leading whitespace from heredoc indentation
+          sed -i 's/^          //' release-notes.md
+
+          # Create the release with the DLL attached
+          gh release create "$TAG" build/version.dll \
+            --title "$TAG" \
+            --notes-file release-notes.md
