@@ -1,4 +1,4 @@
-# Unity 4.6 Dark Mode -- Technical Documentation
+# Unity Dark Mode -- Technical Documentation
 
 This document covers the internal architecture, Win32 API usage, security audit, and differences from the upstream project.
 
@@ -18,7 +18,7 @@ This document covers the internal architecture, Win32 API usage, security audit,
 - [Undocumented APIs and Structures](#undocumented-apis-and-structures)
 - [Colour Palette](#colour-palette)
 - [Security Audit](#security-audit)
-- [Differences from Upstream](#differences-from-upstream)
+- [Differences from 0x7c13/UnityEditor-DarkMode](#differences-from-0x7c13unityeditor-darkmode)
 - [Known Limitations](#known-limitations)
 - [Build Details](#build-details)
 
@@ -26,11 +26,11 @@ This document covers the internal architecture, Win32 API usage, security audit,
 
 ## Architecture Overview
 
-The project is a native Win32 C++ DLL that runs inside the Unity 4.6 Editor process. It has two layers:
+The project is a native Win32 C++ DLL that runs inside the Unity Editor process. It has two layers:
 
 ```
 +------------------------------------------------------+
-|  Unity 4.6 Editor process (32-bit)                   |
+|  Unity 6 Editor process (64-bit)                     |
 |                                                      |
 |  +-----------------+    +-------------------------+  |
 |  | version.dll     |    | Dark Mode Engine        |  |
@@ -46,7 +46,7 @@ The project is a native Win32 C++ DLL that runs inside the Unity 4.6 Editor proc
 |          v                         v                  |
 |  +----------------+    +------------------------+    |
 |  | C:\Windows\    |    | DWM / uxtheme / comctl |    |
-|  | SysWOW64\      |    | system services        |    |
+|  | System32\      |    | system services        |    |
 |  | version.dll    |    +------------------------+    |
 |  +----------------+                                  |
 +------------------------------------------------------+
@@ -67,11 +67,11 @@ The project is a native Win32 C++ DLL that runs inside the Unity 4.6 Editor proc
 
 ## DLL Proxy Layer
 
-**File:** `src/version_proxy.cpp`, `src/version_proxy.h`, `src/version.def`
+**Files:** `src/version_proxy.cpp`, `src/version_proxy.h`, `src/version_proxy.asm`, `src/version.def`
 
 ### Why version.dll?
 
-Unity 4.6 predates Unity's "Load on startup" native plugin system. We need the DLL to load automatically without any user configuration. The DLL proxy technique exploits Windows' DLL search order: when any module in the Unity process requests `version.dll`, Windows searches the application directory first, finds our copy, and loads it.
+The DLL proxy technique exploits Windows' DLL search order: when any module in the Unity process requests `version.dll`, Windows searches the application directory first, finds our copy, and loads it. This requires zero setup — just place the DLL next to `Unity.exe`.
 
 `version.dll` is ideal because:
 - It has only 17 exports (easy to proxy completely).
@@ -83,49 +83,48 @@ Unity 4.6 predates Unity's "Load on startup" native plugin system. We need the D
 On initialization, `InitializeProxy()` resolves the real system DLL:
 
 ```
-GetSystemDirectoryW -> "C:\Windows\SysWOW64" (for 32-bit on 64-bit)
-LoadLibraryW("C:\Windows\SysWOW64\version.dll")
+GetSystemDirectoryW -> "C:\Windows\System32"
+LoadLibraryW("C:\Windows\System32\version.dll")
 GetProcAddress x 17 -> fills g_originalFuncs[]
 ```
 
-Each of the 17 exports is implemented as a **naked x86 assembly trampoline**:
+Each of the 17 exports is implemented as an **x64 MASM assembly trampoline** in `version_proxy.asm`:
 
 ```asm
 ; Example: Proxy_GetFileVersionInfoA
-jmp dword ptr [g_originalFuncs + 0]
+jmp QWORD PTR [g_originalFuncs + 0*8]
 ```
 
 This is a single indirect `JMP` instruction. It:
-- Preserves the calling convention (stdcall, cdecl, or anything else) because it never touches the stack.
-- Preserves all registers because it doesn't clobber any.
+- Preserves the x64 calling convention (rcx, rdx, r8, r9 + stack shadow space) because it never touches any registers or the stack.
 - Has zero overhead beyond the single instruction.
 - Causes the real function to return directly to the original caller (not back to the trampoline).
 
-The `version.def` module definition file maps the public export names (`GetFileVersionInfoA`, etc.) to the internal `Proxy_*` symbols.
+The `version.def` module definition file maps the public export names (`GetFileVersionInfoA`, etc.) to the internal `Proxy_*` symbols defined in the `.asm` file.
 
 ### Exported Functions
 
-| Index | Offset | Export Name |
-|-------|--------|-------------|
-| 0 | 0 | `GetFileVersionInfoA` |
-| 1 | 4 | `GetFileVersionInfoByHandle` |
-| 2 | 8 | `GetFileVersionInfoExA` |
-| 3 | 12 | `GetFileVersionInfoExW` |
-| 4 | 16 | `GetFileVersionInfoSizeA` |
-| 5 | 20 | `GetFileVersionInfoSizeExA` |
-| 6 | 24 | `GetFileVersionInfoSizeExW` |
-| 7 | 28 | `GetFileVersionInfoSizeW` |
-| 8 | 32 | `GetFileVersionInfoW` |
-| 9 | 36 | `VerFindFileA` |
-| 10 | 40 | `VerFindFileW` |
-| 11 | 44 | `VerInstallFileA` |
-| 12 | 48 | `VerInstallFileW` |
-| 13 | 52 | `VerLanguageNameA` |
-| 14 | 56 | `VerLanguageNameW` |
-| 15 | 60 | `VerQueryValueA` |
-| 16 | 64 | `VerQueryValueW` |
+| Index | Export Name |
+|-------|-------------|
+| 0 | `GetFileVersionInfoA` |
+| 1 | `GetFileVersionInfoByHandle` |
+| 2 | `GetFileVersionInfoExA` |
+| 3 | `GetFileVersionInfoExW` |
+| 4 | `GetFileVersionInfoSizeA` |
+| 5 | `GetFileVersionInfoSizeExA` |
+| 6 | `GetFileVersionInfoSizeExW` |
+| 7 | `GetFileVersionInfoSizeW` |
+| 8 | `GetFileVersionInfoW` |
+| 9 | `VerFindFileA` |
+| 10 | `VerFindFileW` |
+| 11 | `VerInstallFileA` |
+| 12 | `VerInstallFileW` |
+| 13 | `VerLanguageNameA` |
+| 14 | `VerLanguageNameW` |
+| 15 | `VerQueryValueA` |
+| 16 | `VerQueryValueW` |
 
-Offsets are in bytes into the `g_originalFuncs[17]` array. Each `FARPROC` is 4 bytes on x86.
+Each `FARPROC` is 8 bytes on x64. The `.asm` trampolines index into `g_originalFuncs[]` at `index * 8`.
 
 ---
 
@@ -283,7 +282,7 @@ Per Win32 documentation, `CBTProc` passes through immediately when `nCode < 0` b
 - `SendMessage` -- control configuration (`CB_GETCOMBOBOXINFO`, `TTM_SETTIPBKCOLOR`, etc.).
 
 ### Module Loading
-- `GetSystemDirectoryW` -- locates the system directory (SysWOW64 for 32-bit on 64-bit OS).
+- `GetSystemDirectoryW` -- locates the System32 directory.
 - `LoadLibraryW` -- loads the real `version.dll`.
 - `LoadLibraryExW` with `LOAD_LIBRARY_SEARCH_SYSTEM32` -- loads `uxtheme.dll` securely.
 - `GetProcAddress` -- resolves function pointers (version.dll exports, uxtheme ordinal #135).
@@ -343,15 +342,15 @@ These structures are reverse-engineered from Windows internals and have been sta
 
 ## Colour Palette
 
-All colours are hardcoded to match Unity 4.6's Pro skin tones:
+All colours are matched to the Unity 6 Editor dark theme (source: Unity Editor Design System color palette):
 
 | Constant | RGB | Hex | Usage |
 |----------|-----|-----|-------|
-| `CLR_TEXT` | 200, 200, 200 | `#C8C8C8` | Menu bar text, control text |
-| `CLR_TEXT_DISABLED` | 160, 160, 160 | `#A0A0A0` | Disabled / greyed menu items |
-| `CLR_BG` | 48, 48, 48 | `#303030` | Menu bar background, control backgrounds, dialog backgrounds |
-| `CLR_BG_HOT` | 62, 62, 62 | `#3E3E3E` | Menu item hover highlight |
-| `CLR_BG_SELECTED` | 62, 62, 62 | `#3E3E3E` | Menu item selected state |
+| `CLR_TEXT` | 210, 210, 210 | `#D2D2D2` | Menu bar text, control text |
+| `CLR_TEXT_DISABLED` | 189, 189, 189 | `#BDBDBD` | Disabled / greyed menu items |
+| `CLR_BG` | 25, 25, 25 | `#191919` | Menu bar background, control backgrounds, dialog backgrounds |
+| `CLR_BG_HOT` | 66, 66, 66 | `#424242` | Menu item hover highlight |
+| `CLR_BG_SELECTED` | 106, 106, 106 | `#6A6A6A` | Menu item selected / pressed state |
 
 ---
 
@@ -373,7 +372,7 @@ All colours are hardcoded to match Unity 4.6's Pro skin tones:
 
 **Input capture:** None. No keyboard hooks (`WH_KEYBOARD`), no mouse hooks (`WH_MOUSE`), no clipboard access. The only hook is `WH_CBT` on the current thread for window lifecycle events.
 
-**Proxy integrity:** All 17 version.dll exports are forwarded via naked JMP trampolines. No arguments are read, modified, or logged. No return values are intercepted.
+**Proxy integrity:** All 17 version.dll exports are forwarded via MASM64 JMP QWORD PTR trampolines. No arguments are read, modified, or logged. No return values are intercepted.
 
 **DLL loading:** Only two DLLs are loaded at runtime:
 - The real `version.dll` from the system directory (via `GetSystemDirectoryW` + `LoadLibraryW`).
@@ -387,53 +386,50 @@ Both are standard Windows system libraries loaded securely.
 
 ---
 
-## Differences from Upstream
+## Differences from 0x7c13/UnityEditor-DarkMode
 
-This project is adapted from [UnityEditor-DarkMode](https://github.com/Shilo/UnityEditor-DarkMode). Key differences:
+This project is inspired by [0x7c13/UnityEditor-DarkMode](https://github.com/0x7c13/UnityEditor-DarkMode). Key differences:
 
 ### Architecture
 
-| Aspect | Upstream | This Project |
+| Aspect | 0x7c13/UnityEditor-DarkMode | This Project |
 |--------|----------|-------------|
 | Injection method | Unity native plugin / Detours `withdll.exe` | version.dll proxy (DLL search order) |
-| Target Unity versions | 2019 -- Unity 6 | Unity 4.6 (32-bit) |
-| Target architecture | x64 | x86 (32-bit, MSVC inline asm) |
-| Source layout | Single `UnityEditorDarkMode.cpp` | Split into `dllmain.cpp`, `darkmode.cpp`, `version_proxy.cpp` |
-| Configuration | INI file with customizable colours | Hardcoded colours (zero-config) |
+| Target Unity versions | 2019 -- Unity 6 | 6.4+ |
+| Target architecture | x64 (inline asm) | x64 (MASM64) |
+| Source layout | Single `UnityEditorDarkMode.cpp` | Split into `dllmain.cpp`, `darkmode.cpp`, `version_proxy.cpp`, `version_proxy.asm` |
+| Configuration | INI file with customizable colours | Hardcoded colours matched to Unity 6 dark theme (zero-config) |
 | Dependencies | inipp (header-only INI parser), ATL (`atlstr.h`), C++20 `<filesystem>` | None -- only Windows system libs, C++17 |
 
-### Bug Fixes Over Upstream
+### Bug Fixes
 
-1. **`WM_CTLCOLORDLG` return value:** Upstream returns a `COLORREF` value cast to `INT_PTR`, which is incorrect -- the handler must return a brush handle. Fixed.
-2. **`PaintDarkButton` debug artifact:** Upstream has a stray `FillRect` with `RGB(127, 192, 127)` (green). Removed.
-3. **`CBTProc` hook chain:** Upstream returns 0 without calling `CallNextHookEx`. Fixed to properly propagate to the next hook.
-4. **`CBTProc` negative nCode:** Upstream does not check for `nCode < 0`. Fixed to pass through immediately per Win32 documentation.
-5. **Button type extraction:** Upstream uses `LOWORD(style)` instead of the correct `style & BS_TYPEMASK`. Fixed with additional coverage for radio buttons, 3-state buttons, and default push buttons.
+1. **`WM_CTLCOLORDLG` return value:** 0x7c13 returns a `COLORREF` value cast to `INT_PTR`, which is incorrect -- the handler must return a brush handle. Fixed.
+2. **`PaintDarkButton` debug artifact:** 0x7c13 has a stray `FillRect` with `RGB(127, 192, 127)` (green). Removed.
+3. **`CBTProc` hook chain:** 0x7c13 returns 0 without calling `CallNextHookEx`. Fixed to properly propagate to the next hook.
+4. **`CBTProc` negative nCode:** 0x7c13 does not check for `nCode < 0`. Fixed to pass through immediately per Win32 documentation.
+5. **Button type extraction:** 0x7c13 uses `LOWORD(style)` instead of the correct `style & BS_TYPEMASK`. Fixed with additional coverage for radio buttons, 3-state buttons, and default push buttons.
 
-### Improvements Over Upstream
+### Improvements
 
 - **Broader window matching:** `IsUnityWindow()` matches `"UnityContainer"` prefix (not just the exact `"UnityContainerWndClass"`), plus any window with a menu bar.
 - **Canonical dark theme names:** Uses `DarkMode_Explorer` and `DarkMode_CFD` (the community-documented identifiers) instead of `"wstr"`.
 - **No external downloads:** The build has zero `FetchContent` or network dependencies.
 
-### Features Removed
+### Features Not Included
 
-- **INI configuration:** Colour customization via `.dll.ini` file. Removed for simplicity (zero-config goal).
-- **CI pipeline:** GitHub Actions workflow not included.
+- **INI configuration:** Colour customization via `.dll.ini` file. Removed for simplicity (zero-config goal). To change colours, edit the `CLR_*` constants in `darkmode.cpp` and rebuild.
 
 ---
 
 ## Known Limitations
 
-1. **x86 only.** The naked assembly trampolines use MSVC inline asm which is only available for 32-bit targets. This matches Unity 4.6 (which is 32-bit) but means the DLL cannot be used with 64-bit Unity editors.
+1. **Windows 10 2004+ required.** The `DWMWA_USE_IMMERSIVE_DARK_MODE` attribute (value 20) and `SetPreferredAppMode` ordinal #135 are not available on older Windows versions.
 
-2. **Windows 10 2004+ required.** The `DWMWA_USE_IMMERSIVE_DARK_MODE` attribute (value 20) and `SetPreferredAppMode` ordinal #135 are not available on older Windows versions.
+2. **No colour customization.** Colours are hardcoded to match Unity 6's dark theme. To change them, edit the `CLR_*` constants in `darkmode.cpp` and rebuild.
 
-3. **No colour customization.** Unlike the upstream project, colours are hardcoded. To change them, edit the `CLR_*` constants in `darkmode.cpp` and rebuild.
+3. **Current thread only.** The CBT hook is installed on the main thread via `GetCurrentThreadId()`. Windows created on background threads will not be automatically patched (this is uncommon in Unity's architecture).
 
-4. **Current thread only.** The CBT hook is installed on the main thread via `GetCurrentThreadId()`. Windows created on background threads will not be automatically patched (this is uncommon in Unity's architecture).
-
-5. **Subclass cleanup on detach.** `ShutdownDarkMode()` removes the CBT hook and destroys GDI resources but does not enumerate and remove subclass procedures from individual windows. This is acceptable because `DLL_PROCESS_DETACH` typically runs during process exit.
+4. **Subclass cleanup on detach.** `ShutdownDarkMode()` removes the CBT hook and destroys GDI resources but does not enumerate and remove subclass procedures from individual windows. This is acceptable because `DLL_PROCESS_DETACH` typically runs during process exit.
 
 ---
 
@@ -442,12 +438,13 @@ This project is adapted from [UnityEditor-DarkMode](https://github.com/Shilo/Uni
 ### Compiler Requirements
 
 - MSVC (Visual Studio 2019 or newer) with the **C++ desktop development** workload.
-- The compiler must support `__declspec(naked)` and inline `__asm` (x86 target only).
+- MASM64 assembler (`ml64.exe`, included with MSVC).
 - C++17 standard (`/std:c++17`).
 
 ### CMake Configuration
 
-- **Generator:** NMake Makefiles (via `build.bat`) or Visual Studio with `-A Win32`.
+- **Languages:** `CXX` + `ASM_MASM`.
+- **Generator:** NMake Makefiles (via `build.bat`) or Visual Studio.
 - **Definitions:** `NOMINMAX`, `UNICODE`, `_UNICODE`.
 - **Linked libraries:** `dwmapi.lib`, `uxtheme.lib`, `comctl32.lib` (via `#pragma comment(lib, ...)`).
 - **Output:** `version.dll` (set via `OUTPUT_NAME` property on the `darkmode_proxy` target).

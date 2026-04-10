@@ -47,15 +47,15 @@ jobs:
           echo "Next version: ${NEXT}"
           echo "tag=${NEXT}" >> "$GITHUB_OUTPUT"
 
-      - name: Setup MSVC x86 toolchain
+      - name: Setup MSVC x64 toolchain
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: x86
+          arch: x64
 
       - name: Install CMake
         uses: lukka/get-cmake@latest
 
-      - name: Build x86 Release DLL
+      - name: Build x64 Release DLL
         run: |
           cmake -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
           cmake --build build
@@ -97,7 +97,7 @@ jobs:
 
           To uninstall, delete \`version.dll\` from the Unity folder.
 
-          > **Requirements:** Windows 11 (or Windows 10 2004+), Unity 4.6 (32-bit Editor).
+          > **Requirements:** Windows 11 (or Windows 10 2004+), Unity 6.4+ (64-bit Editor).
 
           ## Changelog
 
