@@ -6,11 +6,12 @@ Unity 6's dark theme covers the editor panels, but the OS-level window chrome st
 
 ## Quick Start
 
-1. Build the project (see [Building](#building)) or download `version.dll` from a release.
+1. Download `version.dll.zip` from the [latest release](../../releases/latest) and extract `version.dll`.
+   - Or build it yourself (see [Building](#building)).
 2. Open the folder that contains `Unity.exe`.
    - Easy way: **Unity Hub > Installs > Manage > Show in Explorer**
    - Direct path: `%ProgramFiles%\Unity\Hub\Editor\<version>\Editor\` (example: `C:\Program Files\Unity\Hub\Editor\6000.4.0f1\Editor\`)
-3. Move `version.dll` into that folder so it sits next to `Unity.exe`.
+3. Move `version.dll` into that folder next to `Unity.exe`.
 4. Launch Unity normally. Everything is dark.
 
 To remove, delete `version.dll` from the same folder.

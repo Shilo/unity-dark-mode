@@ -80,11 +80,13 @@ jobs:
           cmake -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
           cmake --build build
 
-      - name: Verify output
+      - name: Verify output and package
         run: |
           if (!(Test-Path "build\version.dll")) { throw "version.dll not found" }
           $size = (Get-Item "build\version.dll").Length
           Write-Host "version.dll size: $size bytes"
+          # Zip the DLL so browsers don't block the download
+          Compress-Archive -Path "build\version.dll" -DestinationPath "build\version.dll.zip" -Force
 
       - name: Create tag and release
         shell: bash
@@ -107,7 +109,7 @@ jobs:
           cat > release-notes.md << NOTES
           ## Installation
 
-          1. Download \`version.dll\` below.
+          1. Download \`version.dll.zip\` below and extract \`version.dll\`.
           2. Open the folder that contains \`Unity.exe\`.
              Easy way: **Unity Hub > Installs > Manage > Show in Explorer**
              Direct path: \`%ProgramFiles%\\Unity\\Hub\\Editor\\<version>\\Editor\\` (example: \`C:\\Program Files\\Unity\\Hub\\Editor\\6000.4.0f1\\Editor\\`)
@@ -134,7 +136,7 @@ jobs:
           # on the current commit. If the command fails partway through
           # (e.g. asset upload fails after release/tag creation), clean up
           # the partial release and tag so a rerun starts fresh.
-          if ! gh release create "$TAG" build/version.dll \
+          if ! gh release create "$TAG" build/version.dll.zip \
             --title "$TAG" \
             --target "$GITHUB_SHA" \
             --notes-file release-notes.md; then
