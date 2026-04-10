@@ -7,10 +7,15 @@ Unity 6's dark theme covers the editor panels, but the OS-level window chrome st
 ## Quick Start
 
 1. Build the project (see [Building](#building)) or download `version.dll` from a release.
-2. Copy `version.dll` into the same folder as your `Unity.exe`.
-3. Launch Unity normally. Everything is dark.
+2. Open the folder that contains `Unity.exe`.
+   - Easy way: **Unity Hub > Installs > Manage > Show in Explorer**
+   - Direct path: `%ProgramFiles%\Unity\Hub\Editor\<version>\Editor\` (example: `C:\Program Files\Unity\Hub\Editor\6000.4.0f1\Editor\`)
+3. Move `version.dll` into that folder so it sits next to `Unity.exe`.
+4. Launch Unity normally. Everything is dark.
 
-To remove, delete `version.dll` from the Unity folder.
+To remove, delete `version.dll` from the same folder.
+
+> **Important:** Put the DLL next to `Unity.exe`, not in your Unity project folder and not next to the Unity Hub app itself.
 
 ## What Gets Patched
 
@@ -30,7 +35,7 @@ The DLL uses the **version.dll proxy** technique. It masquerades as `version.dll
 On load, the DLL applies four layers of dark mode patching:
 
 1. **Dark title bar** -- `DwmSetWindowAttribute` with `DWMWA_USE_IMMERSIVE_DARK_MODE` tells Windows 11 to render the title bar in dark mode.
-2. **Dark context menus** -- The undocumented `SetPreferredAppMode` API (uxtheme.dll ordinal #135, available since Windows 10 1903) forces all context menus and popup menus to use dark colours.
+2. **Dark context menus** -- Four undocumented uxtheme.dll ordinals (stable since Windows 10 1903) work together: `SetPreferredAppMode` (#135) forces dark context menus process-wide, `AllowDarkModeForWindow` (#133) opts each window into dark theme class resolution, `RefreshImmersiveColorPolicyState` (#104) commits the colour policy, and `FlushMenuThemes` (#136) refreshes cached menu visuals immediately.
 3. **Dark menu bar** -- A window subclass intercepts the undocumented UAH (User Action Handler) messages `WM_UAHDRAWMENU` (0x0091) and `WM_UAHDRAWMENUITEM` (0x0092) to custom-draw the menu bar background and text in dark colours.
 4. **Dark controls and dialogs** -- The subclass handles `WM_CTLCOLOR*` messages to set dark backgrounds on edit boxes, list boxes, static text, scroll bars, and dialogs. Tooltips, tree views, list views, combo boxes, and buttons are individually themed.
 
@@ -77,6 +82,8 @@ This project is inspired by 0x7c13/UnityEditor-DarkMode and uses similar Win32 d
 | **C++ standard**          | C++20                                                              | C++17                                                                  |
 | **DLL injection**         | Native plugin loaded by Unity's plugin system                      | version.dll proxy with x64 MASM trampolines                           |
 | **Source layout**         | Single `.cpp` file                                                 | Split across `dllmain.cpp`, `darkmode.cpp`, `version_proxy.cpp/.asm`   |
+| **Crash protection**      | None — undocumented API failure crashes the host app               | SEH wraps all init and hooks — silently disables on failure            |
+| **Dark mode APIs**        | uxtheme ordinal #135 only                                          | Ordinals #133, #135, #104, #136 for fuller coverage                    |
 | **Build**                 | CMake                                                              | CMake + one-step `build.bat` (auto-detects Visual Studio)              |
 
 For older Unity versions that require specific setup methods, use the original project.
@@ -105,7 +112,7 @@ unity-dark-mode/
 
 ## Safety
 
-This DLL has been security-audited. It makes **no network calls**, writes **no files**, accesses **no private data**, and forwards all `version.dll` calls without tampering. The full audit is in [DOCUMENTATION.md](DOCUMENTATION.md).
+This DLL has been security-audited. It makes **no network calls**, writes **no files**, accesses **no private data**, and forwards all `version.dll` calls without tampering. Structured exception handling (SEH) wraps all initialization and hook callbacks so that if any undocumented API misbehaves on a future Windows build, dark mode silently disables itself instead of crashing Unity. The full audit is in [DOCUMENTATION.md](DOCUMENTATION.md).
 
 ## Troubleshooting
 
@@ -113,7 +120,7 @@ This DLL has been security-audited. It makes **no network calls**, writes **no f
 Ensure you built the DLL for x64 (64-bit). A 32-bit DLL cannot be loaded by the 64-bit Unity Editor.
 
 **Dark mode doesn't apply:**
-Make sure the DLL is named exactly `version.dll` and is in the same directory as `Unity.exe` (not a subfolder).
+Make sure the DLL is named exactly `version.dll` and is in the same directory as `Unity.exe` (not a subfolder). On a standard Unity Hub install, that folder is `%ProgramFiles%\Unity\Hub\Editor\<version>\Editor\`.
 
 **Menu bar flickers or reverts to light:**
 The DLL blocks `WM_STYLECHANGING`/`WM_STYLECHANGED` on Unity container windows to prevent this. If it still happens, check that no other plugin is also modifying window styles.

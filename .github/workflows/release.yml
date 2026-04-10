@@ -108,10 +108,15 @@ jobs:
           ## Installation
 
           1. Download \`version.dll\` below.
-          2. Copy it into the same folder as your \`Unity.exe\` (e.g. \`C:\\Program Files\\Unity\\Editor\\\`).
-          3. Launch Unity. The title bar, menu bar, context menus, and dialogs are now dark.
+          2. Open the folder that contains \`Unity.exe\`.
+             Easy way: **Unity Hub > Installs > Manage > Show in Explorer**
+             Direct path: \`%ProgramFiles%\\Unity\\Hub\\Editor\\<version>\\Editor\\` (example: \`C:\\Program Files\\Unity\\Hub\\Editor\\6000.4.0f1\\Editor\\`)
+          3. Move \`version.dll\` into that folder so it sits next to \`Unity.exe\`.
+          4. Launch Unity. The title bar, menu bar, context menus, and dialogs are now dark.
 
-          To uninstall, delete \`version.dll\` from the Unity folder.
+          Put the DLL next to \`Unity.exe\`, not in your project folder and not next to the Unity Hub app.
+
+          To uninstall, delete \`version.dll\` from the same folder.
 
           > **Requirements:** Windows 11 (or Windows 10 2004+), Unity 6.4+ (64-bit Editor).
 

@@ -94,6 +94,8 @@ static const COLORREF CLR_TEXT_DISABLED = RGB(189, 189, 189);  // #BDBDBD
 static const COLORREF CLR_BG           = RGB(25, 25, 25);     // #191919
 static const COLORREF CLR_BG_HOT       = RGB(66, 66, 66);     // #424242
 static const COLORREF CLR_BG_SELECTED  = RGB(106, 106, 106);  // #6A6A6A
+static const COLORREF CLR_BTN          = RGB(88, 88, 88);      // #585858
+static const COLORREF CLR_BTN_BORDER   = RGB(48, 48, 48);      // #303030
 
 static HBRUSH g_brBg          = nullptr;
 static HBRUSH g_brBgHot       = nullptr;
@@ -147,6 +149,7 @@ static bool ShouldSubclass(HWND hWnd)
     if (IsWndClass(hWnd, L"ComboBox"))               return true;
     if (IsWndClass(hWnd, L"SysListView32"))          return true;
     if (IsWndClass(hWnd, L"SysTreeView32"))          return true;
+    if (IsWndClass(hWnd, L"SysHeader32"))             return true;
 
     // Also subclass any window that owns a menu bar
     if (GetMenu(hWnd) != nullptr)                    return true;
@@ -156,29 +159,66 @@ static bool ShouldSubclass(HWND hWnd)
 
 // ---------------------------------------------------------------------------
 // EnableDarkMode -- per-window and per-process
+//
+// Uses four undocumented uxtheme.dll ordinals (stable since Win 10 1903):
+//   #133  AllowDarkModeForWindow           -- per-window opt-in
+//   #135  SetPreferredAppMode              -- process-level dark mode
+//   #104  RefreshImmersiveColorPolicyState  -- commit colour policy change
+//   #136  FlushMenuThemes                  -- refresh cached menu visuals
 // ---------------------------------------------------------------------------
 static void EnableDarkModeForWindow(HWND hWnd)
 {
-    // Dark title bar via documented DWM attribute (Windows 10 2004+ / Win 11)
+    using fnAllowDarkModeForWindow          = BOOL(WINAPI*)(HWND, BOOL);
+    using fnSetPreferredAppMode             = PreferredAppMode(WINAPI*)(PreferredAppMode);
+    using fnFlushMenuThemes                 = void(WINAPI*)();
+    using fnRefreshImmersiveColorPolicyState = void(WINAPI*)();
+
+    static fnAllowDarkModeForWindow          pAllowDarkModeForWindow          = nullptr;
+    static fnSetPreferredAppMode             pSetPreferredAppMode             = nullptr;
+    static fnFlushMenuThemes                 pFlushMenuThemes                 = nullptr;
+    static fnRefreshImmersiveColorPolicyState pRefreshImmersiveColorPolicyState = nullptr;
+    static bool resolved = false;
+
+    if (!resolved)
+    {
+        resolved = true;
+        HMODULE hUx = LoadLibraryExW(L"uxtheme.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (hUx)
+        {
+            pAllowDarkModeForWindow          = reinterpret_cast<fnAllowDarkModeForWindow>(
+                GetProcAddress(hUx, MAKEINTRESOURCEA(133)));
+            pSetPreferredAppMode             = reinterpret_cast<fnSetPreferredAppMode>(
+                GetProcAddress(hUx, MAKEINTRESOURCEA(135)));
+            pFlushMenuThemes                 = reinterpret_cast<fnFlushMenuThemes>(
+                GetProcAddress(hUx, MAKEINTRESOURCEA(136)));
+            pRefreshImmersiveColorPolicyState = reinterpret_cast<fnRefreshImmersiveColorPolicyState>(
+                GetProcAddress(hUx, MAKEINTRESOURCEA(104)));
+        }
+    }
+
     if (hWnd)
     {
+        // Dark title bar via documented DWM attribute (Windows 10 2004+ / Win 11)
         static constexpr DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_ATTR = 20;
         const BOOL useDark = TRUE;
         DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE_ATTR, &useDark, sizeof(useDark));
+
+        // Per-window dark mode via undocumented ordinal #133
+        if (pAllowDarkModeForWindow)
+            pAllowDarkModeForWindow(hWnd, TRUE);
     }
-
-    // Force dark context menus via undocumented uxtheme ordinal #135
-    static HMODULE hUxtheme = nullptr;
-    if (!hUxtheme)
-        hUxtheme = LoadLibraryExW(L"uxtheme.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
-
-    if (hUxtheme)
+    else
     {
-        using fnSetPreferredAppMode = PreferredAppMode(WINAPI*)(PreferredAppMode);
-        auto SetPreferredAppMode =
-            reinterpret_cast<fnSetPreferredAppMode>(GetProcAddress(hUxtheme, MAKEINTRESOURCEA(135)));
-        if (SetPreferredAppMode)
-            SetPreferredAppMode(PreferredAppMode::ForceDark);
+        // Process-level: force dark context menus via ordinal #135
+        if (pSetPreferredAppMode)
+            pSetPreferredAppMode(PreferredAppMode::ForceDark);
+
+        // Commit the colour-policy change and flush cached menu themes
+        // so dark mode takes effect immediately on existing menus.
+        if (pRefreshImmersiveColorPolicyState)
+            pRefreshImmersiveColorPolicyState();
+        if (pFlushMenuThemes)
+            pFlushMenuThemes();
     }
 }
 
@@ -205,12 +245,14 @@ static void DrawMenuBarBottomLine(HWND hWnd)
     rcLine.top--;
 
     HDC hdc = GetWindowDC(hWnd);
+    if (!hdc)
+        return;
     FillRect(hdc, &rcLine, g_brBg);
     ReleaseDC(hWnd, hdc);
 }
 
 // ---------------------------------------------------------------------------
-// Owner-draw dark button
+// Owner-draw dark button  (Unity 6 button colours)
 // ---------------------------------------------------------------------------
 static void PaintDarkButton(const DRAWITEMSTRUCT& dis)
 {
@@ -218,15 +260,27 @@ static void PaintDarkButton(const DRAWITEMSTRUCT& dis)
     RECT rc;
     GetClientRect(hwnd, &rc);
 
+    // Background colour varies with button state
+    COLORREF bgClr = CLR_BTN;                                    // #585858
+    if (dis.itemState & ODS_SELECTED)
+        bgClr = CLR_BG_SELECTED;                                // #6A6A6A pressed
+    else if (dis.itemState & ODS_HOTLIGHT)
+        bgClr = CLR_BG_HOT;                                     // #424242 hover
+
+    COLORREF txtClr = (dis.itemState & (ODS_GRAYED | ODS_DISABLED))
+                        ? CLR_TEXT_DISABLED : CLR_TEXT;
+
     HDC   hdc     = dis.hDC;
-    HBRUSH brush  = CreateSolidBrush(CLR_BG);
-    HPEN   pen    = CreatePen(PS_SOLID, 1, CLR_TEXT);
+    HBRUSH brush  = CreateSolidBrush(bgClr);
+    HPEN   pen    = CreatePen(PS_SOLID, 1, CLR_BTN_BORDER);     // #303030
     HGDIOBJ oldBr = SelectObject(hdc, brush);
     HGDIOBJ oldPn = SelectObject(hdc, pen);
 
-    SelectObject(hdc, reinterpret_cast<HFONT>(SendMessage(hwnd, WM_GETFONT, 0, 0)));
-    SetBkColor(hdc, CLR_BG);
-    SetTextColor(hdc, CLR_TEXT);
+    HFONT font = reinterpret_cast<HFONT>(SendMessage(hwnd, WM_GETFONT, 0, 0));
+    HGDIOBJ oldFont = font ? SelectObject(hdc, font) : nullptr;
+
+    SetBkColor(hdc, bgClr);
+    SetTextColor(hdc, txtClr);
 
     Rectangle(hdc, 0, 0, rc.right, rc.bottom);
 
@@ -241,6 +295,8 @@ static void PaintDarkButton(const DRAWITEMSTRUCT& dis)
     GetWindowTextW(hwnd, buf, 128);
     DrawTextW(hdc, buf, -1, &rc, DT_EDITCONTROL | DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
+    if (oldFont)
+        SelectObject(hdc, oldFont);
     SelectObject(hdc, oldPn);
     SelectObject(hdc, oldBr);
     DeleteObject(brush);
@@ -258,6 +314,7 @@ static LRESULT CALLBACK SubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
     switch (uMsg)
     {
     // ----- control background colours -----
+    case WM_CTLCOLORBTN:
     case WM_CTLCOLORDLG:
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORLISTBOX:
@@ -314,12 +371,10 @@ static LRESULT CALLBACK SubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         else if (IsWndClass(hWnd, L"ComboBox"))
         {
             SetWindowTheme(hWnd, L"DarkMode_CFD", nullptr);
-            COMBOBOXINFO cbi = { sizeof(cbi) };
-            if (SendMessage(hWnd, CB_GETCOMBOBOXINFO, 0, reinterpret_cast<LPARAM>(&cbi)))
-            {
-                if (cbi.hwndList)
-                    SetWindowTheme(cbi.hwndList, L"DarkMode_Explorer", nullptr);
-            }
+        }
+        else if (IsWndClass(hWnd, L"SysHeader32"))
+        {
+            SetWindowTheme(hWnd, L"DarkMode_ItemsView", nullptr);
         }
         else if (IsWndClass(hWnd, L"Button"))
         {
@@ -340,6 +395,22 @@ static LRESULT CALLBACK SubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
             }
         }
         break;
+    }
+
+    // ----- create: theme combo-box internals after child windows exist -----
+    case WM_CREATE:
+    {
+        LRESULT result = DefSubclassProc(hWnd, uMsg, wParam, lParam);
+        if (IsWndClass(hWnd, L"ComboBox"))
+        {
+            COMBOBOXINFO cbi = { sizeof(cbi) };
+            if (SendMessage(hWnd, CB_GETCOMBOBOXINFO, 0, reinterpret_cast<LPARAM>(&cbi)))
+            {
+                if (cbi.hwndList)
+                    SetWindowTheme(cbi.hwndList, L"DarkMode_Explorer", nullptr);
+            }
+        }
+        return result;
     }
 
     // ----- paint: set colours on specific controls -----
@@ -467,25 +538,32 @@ static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
     if (nCode < 0)
         return CallNextHookEx(g_cbtHook, nCode, wParam, lParam);
 
-    switch (nCode)
+    __try
     {
-    case HCBT_CREATEWND:
-    {
-        HWND hWnd = reinterpret_cast<HWND>(wParam);
-        if (ShouldSubclass(hWnd))
+        switch (nCode)
         {
-            EnableDarkModeForWindow(hWnd);
-            SetWindowSubclass(hWnd, SubclassProc, 0, 0);
+        case HCBT_CREATEWND:
+        {
+            HWND hWnd = reinterpret_cast<HWND>(wParam);
+            if (ShouldSubclass(hWnd))
+            {
+                EnableDarkModeForWindow(hWnd);
+                SetWindowSubclass(hWnd, SubclassProc, 0, 0);
+            }
+            break;
         }
-        break;
+        case HCBT_DESTROYWND:
+        {
+            HWND hWnd = reinterpret_cast<HWND>(wParam);
+            if (ShouldSubclass(hWnd))
+                RemoveWindowSubclass(hWnd, SubclassProc, 0);
+            break;
+        }
+        }
     }
-    case HCBT_DESTROYWND:
+    __except(EXCEPTION_EXECUTE_HANDLER)
     {
-        HWND hWnd = reinterpret_cast<HWND>(wParam);
-        if (ShouldSubclass(hWnd))
-            RemoveWindowSubclass(hWnd, SubclassProc, 0);
-        break;
-    }
+        // Silent no-op: skip dark mode for this window rather than crash Unity
     }
 
     return CallNextHookEx(g_cbtHook, nCode, wParam, lParam);
@@ -496,32 +574,39 @@ static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 // ---------------------------------------------------------------------------
 void InitializeDarkMode()
 {
-    CreateBrushes();
-
-    // Apply dark mode at the process level (forces dark context menus)
-    EnableDarkModeForWindow(nullptr);
-
-    // Dark-mode every existing window belonging to this process
-    DWORD pid = GetCurrentProcessId();
-    HWND  hWnd = nullptr;
-    do
+    __try
     {
-        hWnd = FindWindowEx(nullptr, hWnd, nullptr, nullptr);
-        if (hWnd)
-        {
-            DWORD wndPid = 0;
-            GetWindowThreadProcessId(hWnd, &wndPid);
-            if (wndPid == pid)
-            {
-                EnableDarkModeForWindow(hWnd);
-                if (ShouldSubclass(hWnd))
-                    SetWindowSubclass(hWnd, SubclassProc, 0, 0);
-            }
-        }
-    } while (hWnd);
+        CreateBrushes();
 
-    // Hook future window creation on the current thread
-    g_cbtHook = SetWindowsHookEx(WH_CBT, CBTProc, nullptr, GetCurrentThreadId());
+        // Apply dark mode at the process level (forces dark context menus)
+        EnableDarkModeForWindow(nullptr);
+
+        // Dark-mode every existing window belonging to this process
+        DWORD pid = GetCurrentProcessId();
+        HWND  hWnd = nullptr;
+        do
+        {
+            hWnd = FindWindowEx(nullptr, hWnd, nullptr, nullptr);
+            if (hWnd)
+            {
+                DWORD wndPid = 0;
+                GetWindowThreadProcessId(hWnd, &wndPid);
+                if (wndPid == pid)
+                {
+                    EnableDarkModeForWindow(hWnd);
+                    if (ShouldSubclass(hWnd))
+                        SetWindowSubclass(hWnd, SubclassProc, 0, 0);
+                }
+            }
+        } while (hWnd);
+
+        // Hook future window creation on the current thread
+        g_cbtHook = SetWindowsHookEx(WH_CBT, CBTProc, nullptr, GetCurrentThreadId());
+    }
+    __except(EXCEPTION_EXECUTE_HANDLER)
+    {
+        // Silent no-op: dark mode init failed but Unity continues normally
+    }
 }
 
 void ShutdownDarkMode()

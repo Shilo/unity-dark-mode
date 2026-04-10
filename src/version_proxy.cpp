@@ -1,5 +1,4 @@
 #include "version_proxy.h"
-#include <cstdio>
 
 // ---------------------------------------------------------------------------
 // version.dll proxy
@@ -56,7 +55,7 @@ void InitializeProxy()
     GetSystemDirectoryW(systemDir, MAX_PATH);
 
     wchar_t dllPath[MAX_PATH];
-    swprintf_s(dllPath, L"%s\\version.dll", systemDir);
+    wsprintfW(dllPath, L"%s\\version.dll", systemDir);
 
     g_realVersionDll = LoadLibraryW(dllPath);
     if (!g_realVersionDll)
