@@ -22,7 +22,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Get the latest version tag (e.g. v1.3), sorted by version
-          LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | head -n 1)
+          LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | head -n 1 || true)
 
           if [ -z "$LATEST" ]; then
             NEXT="v0.1"
@@ -38,7 +38,7 @@ jobs:
                 echo "Found orphaned tag ${LATEST} with no release. Cleaning up."
                 git push origin --delete "$LATEST" 2>/dev/null || true
                 # Recalculate: find the tag before the orphan
-                PREV=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | grep -v "^${LATEST}$" | head -n 1)
+                PREV=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | grep -v "^${LATEST}$" | head -n 1 || true)
                 echo "prev_tag=${PREV}" >> "$GITHUB_OUTPUT"
                 NEXT="$LATEST"
               else

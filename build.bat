@@ -60,9 +60,9 @@ echo Folder: %BUILD_DIR%
 if exist "%OUTPUT_FILE%" dir /b "%OUTPUT_FILE%"
 
 if defined BUILD_OPENER (
-    call "%BUILD_OPENER%" "%BUILD_DIR%"
+    call "%BUILD_OPENER%" "%OUTPUT_FILE%"
 ) else (
-    start "" explorer "%BUILD_DIR%" >nul 2>&1
+    start "" explorer /select,"%OUTPUT_FILE%" >nul 2>&1
 )
 
 exit /b 0
