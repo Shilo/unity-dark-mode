@@ -74,17 +74,13 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           PREV_TAG="${{ steps.version.outputs.prev_tag }}"
 
-          # Create and push the version tag
-          git tag "$TAG"
-          git push origin "$TAG"
-
           # Generate changelog
           if [ -z "$PREV_TAG" ]; then
             CHANGELOG_HEADER="Initial release."
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
           else
             CHANGELOG_HEADER="Changes since \`${PREV_TAG}\`:"
-            CHANGELOG=$(git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s (%h)" --no-merges)
+            CHANGELOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges)
           fi
 
           # Build release notes
@@ -109,7 +105,10 @@ jobs:
           # Strip leading whitespace from heredoc indentation
           sed -i 's/^          //' release-notes.md
 
-          # Create the GitHub release with the DLL attached
+          # Create the tag and release atomically via gh.
+          # --target ensures the tag is created on the current commit.
+          # If this step fails, no orphaned tag is left behind.
           gh release create "$TAG" build/version.dll \
             --title "$TAG" \
+            --target "$GITHUB_SHA" \
             --notes-file release-notes.md

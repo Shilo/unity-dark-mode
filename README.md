@@ -75,7 +75,7 @@ This project is inspired by 0x7c13/UnityEditor-DarkMode and uses similar Win32 d
 | **Configuration**         | INI file for custom colours                                        | Zero-config (colours matched to Unity 6 dark theme)                    |
 | **External dependencies** | inipp (INI parser), ATL, C++20 `<filesystem>`                      | None                                                                   |
 | **C++ standard**          | C++20                                                              | C++17                                                                  |
-| **Trampolines**           | x86 inline asm (`__declspec(naked)`)                               | x64 MASM (`version_proxy.asm`)                                         |
+| **DLL injection**         | Native plugin loaded by Unity's plugin system                      | version.dll proxy with x64 MASM trampolines                           |
 | **Source layout**         | Single `.cpp` file                                                 | Split across `dllmain.cpp`, `darkmode.cpp`, `version_proxy.cpp/.asm`   |
 | **Build**                 | CMake                                                              | CMake + one-step `build.bat` (auto-detects Visual Studio)              |
 

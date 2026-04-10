@@ -396,7 +396,7 @@ This project is inspired by [0x7c13/UnityEditor-DarkMode](https://github.com/0x7
 |--------|----------|-------------|
 | Injection method | Unity native plugin / Detours `withdll.exe` | version.dll proxy (DLL search order) |
 | Target Unity versions | 2019 -- Unity 6 | 6.4+ |
-| Target architecture | x64 (inline asm) | x64 (MASM64) |
+| DLL injection | Native Unity plugin / Detours | version.dll proxy with x64 MASM trampolines |
 | Source layout | Single `UnityEditorDarkMode.cpp` | Split into `dllmain.cpp`, `darkmode.cpp`, `version_proxy.cpp`, `version_proxy.asm` |
 | Configuration | INI file with customizable colours | Hardcoded colours matched to Unity 6 dark theme (zero-config) |
 | Dependencies | inipp (header-only INI parser), ATL (`atlstr.h`), C++20 `<filesystem>` | None -- only Windows system libs, C++17 |
