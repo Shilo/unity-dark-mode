@@ -30,13 +30,21 @@ jobs:
           else
             # Check if the latest tag has an incomplete release (orphaned tag).
             # If so, clean it up and reuse that version number.
-            if ! gh release view "$LATEST" &>/dev/null; then
-              echo "Found orphaned tag ${LATEST} with no release. Cleaning up."
-              git push origin --delete "$LATEST" 2>/dev/null || true
-              # Recalculate: find the tag before the orphan
-              PREV=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | grep -v "^${LATEST}$" | head -n 1)
-              echo "prev_tag=${PREV}" >> "$GITHUB_OUTPUT"
-              NEXT="$LATEST"
+            # Important: distinguish "release not found" from transient API errors
+            # (rate limits, network issues) to avoid deleting a valid tag.
+            VIEW_STDERR=$(gh release view "$LATEST" 2>&1 >/dev/null) && VIEW_OK=true || VIEW_OK=false
+            if [ "$VIEW_OK" = "false" ]; then
+              if echo "$VIEW_STDERR" | grep -qi "not found"; then
+                echo "Found orphaned tag ${LATEST} with no release. Cleaning up."
+                git push origin --delete "$LATEST" 2>/dev/null || true
+                # Recalculate: find the tag before the orphan
+                PREV=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | grep -v "^${LATEST}$" | head -n 1)
+                echo "prev_tag=${PREV}" >> "$GITHUB_OUTPUT"
+                NEXT="$LATEST"
+              else
+                echo "::error::Failed to check release status for ${LATEST}: ${VIEW_STDERR}"
+                exit 1
+              fi
             else
               echo "prev_tag=${LATEST}" >> "$GITHUB_OUTPUT"
 
@@ -127,7 +135,19 @@ jobs:
             --notes-file release-notes.md; then
 
             echo "Release creation failed. Cleaning up partial release/tag."
-            gh release delete "$TAG" --yes 2>/dev/null || true
+            # --cleanup-tag deletes the associated git tag alongside the release.
+            gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+            # If the release still couldn't be deleted (it may never have been
+            # created), try removing just the tag.
             git push origin --delete "$TAG" 2>/dev/null || true
+
+            # Verify cleanup actually succeeded. Surface warnings so operators
+            # know to intervene manually before rerunning.
+            if gh release view "$TAG" &>/dev/null; then
+              echo "::warning::Cleanup incomplete — release ${TAG} still exists. Delete manually before rerunning."
+            fi
+            if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+              echo "::warning::Cleanup incomplete — tag ${TAG} still exists on remote. Delete manually before rerunning."
+            fi
             exit 1
           fi
