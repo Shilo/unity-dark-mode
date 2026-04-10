@@ -1,4 +1,4 @@
-# Unity Dark Mode
+# Unity Dark Mode Mod
 
 Zero-setup dark mode for the Unity 6 Editor on Windows 11. Drop a single DLL next to `Unity.exe` and the title bar, menu bar, context menus, and native dialogs all go dark.
 
