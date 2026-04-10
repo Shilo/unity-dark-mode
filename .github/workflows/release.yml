@@ -112,7 +112,7 @@ jobs:
           1. Download \`version.dll.zip\` below and extract \`version.dll\`.
           2. Open the folder that contains \`Unity.exe\`.
              Easy way: **Unity Hub > Installs > Manage > Show in Explorer**
-             Direct path: \`%ProgramFiles%\\Unity\\Hub\\Editor\\<version>\\Editor\\` (example: \`C:\\Program Files\\Unity\\Hub\\Editor\\6000.4.0f1\\Editor\\`)
+             Direct path: \`%ProgramFiles%\\Unity\\Hub\\Editor\\<version>\\Editor\` (example: \`C:\\Program Files\\Unity\\Hub\\Editor\\6000.4.0f1\\Editor\`)
           3. Move \`version.dll\` into that folder so it sits next to \`Unity.exe\`.
           4. Launch Unity. The title bar, menu bar, context menus, and dialogs are now dark.
 

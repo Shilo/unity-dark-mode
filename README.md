@@ -10,7 +10,7 @@ Unity 6's dark theme covers the editor panels, but the OS-level window chrome st
    - Or build it yourself (see [Building](#building)).
 2. Open the folder that contains `Unity.exe`.
    - Easy way: **Unity Hub > Installs > Manage > Show in Explorer**
-   - Direct path: `%ProgramFiles%\Unity\Hub\Editor\<version>\Editor\` (example: `C:\Program Files\Unity\Hub\Editor\6000.4.0f1\Editor\`)
+   - Direct path: `%ProgramFiles%\Unity\Hub\Editor\<version>\Editor` (example: `C:\Program Files\Unity\Hub\Editor\6000.4.0f1\Editor`)
 3. Move `version.dll` into that folder next to `Unity.exe`.
 4. Launch Unity normally. Everything is dark.
 
@@ -121,7 +121,7 @@ This DLL has been security-audited. It makes **no network calls**, writes **no f
 Ensure you built the DLL for x64 (64-bit). A 32-bit DLL cannot be loaded by the 64-bit Unity Editor.
 
 **Dark mode doesn't apply:**
-Make sure the DLL is named exactly `version.dll` and is in the same directory as `Unity.exe` (not a subfolder). On a standard Unity Hub install, that folder is `%ProgramFiles%\Unity\Hub\Editor\<version>\Editor\`.
+Make sure the DLL is named exactly `version.dll` and is in the same directory as `Unity.exe` (not a subfolder). On a standard Unity Hub install, that folder is `%ProgramFiles%\Unity\Hub\Editor\<version>\Editor`.
 
 **Menu bar flickers or reverts to light:**
 The DLL blocks `WM_STYLECHANGING`/`WM_STYLECHANGED` on Unity container windows to prevent this. If it still happens, check that no other plugin is also modifying window styles.
