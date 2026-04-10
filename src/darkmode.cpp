@@ -80,13 +80,20 @@ typedef struct tagUAHMEASUREMENUITEM
 } UAHMEASUREMENUITEM;
 
 // ---------------------------------------------------------------------------
-// Dark theme colours (matched to Unity 4.6 Pro skin tones)
+// Dark theme colours (matched to Unity 6 Editor dark theme)
+//
+// Source: Unity Editor Design System color palette
+//   App Toolbar Background: #191919
+//   App Toolbar Button Hover: #424242
+//   App Toolbar Button Pressed: #6A6A6A
+//   Default Text: #D2D2D2
+//   Disabled/secondary Text: #BDBDBD
 // ---------------------------------------------------------------------------
-static const COLORREF CLR_TEXT          = RGB(200, 200, 200);
-static const COLORREF CLR_TEXT_DISABLED = RGB(160, 160, 160);
-static const COLORREF CLR_BG           = RGB(48, 48, 48);
-static const COLORREF CLR_BG_HOT       = RGB(62, 62, 62);
-static const COLORREF CLR_BG_SELECTED  = RGB(62, 62, 62);
+static const COLORREF CLR_TEXT          = RGB(210, 210, 210);  // #D2D2D2
+static const COLORREF CLR_TEXT_DISABLED = RGB(189, 189, 189);  // #BDBDBD
+static const COLORREF CLR_BG           = RGB(25, 25, 25);     // #191919
+static const COLORREF CLR_BG_HOT       = RGB(66, 66, 66);     // #424242
+static const COLORREF CLR_BG_SELECTED  = RGB(106, 106, 106);  // #6A6A6A
 
 static HBRUSH g_brBg          = nullptr;
 static HBRUSH g_brBgHot       = nullptr;
